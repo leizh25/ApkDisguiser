@@ -22,9 +22,6 @@ class ShellApkTest {
                     android.content.pm.PackageManager.GET_ACTIVITIES
             )
             assertNotNull(info)
-            val host = context.packageManager.getPackageInfo(context.packageName,
-                android.content.pm.PackageManager.GET_SIGNATURES)
-            assertEquals(host.signatures!!.single(), android.content.pm.Signature(key.certificate.encoded))
             assertEquals(app.id, info!!.packageName)
             assertEquals(ShellApk.activityName, info.activities!!.single().name)
             assertEquals(app.name, info.applicationInfo!!.nonLocalizedLabel.toString())

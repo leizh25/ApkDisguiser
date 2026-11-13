@@ -36,18 +36,6 @@ jobs:
           fi
           "$sdkmanager" --sdk_root="$ANDROID_HOME" "platforms;android-37.0" "build-tools;37.0.0"
 
-      - name: Prepare debug signing key
-        env:
-          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
-        run: |
-          if [[ -z "$DEBUG_KEYSTORE_BASE64" ]]; then
-            echo "::error::Configure the DEBUG_KEYSTORE_BASE64 repository secret."
-            exit 1
-          fi
-          umask 077
-          mkdir -p ~/.android
-          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > ~/.android/debug.keystore
-
       - name: Resolve release version
         id: version
         env:
@@ -95,7 +83,7 @@ jobs:
         env:
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           VERSION: ${{ steps.version.outputs.version }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |

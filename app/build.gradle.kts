@@ -73,13 +73,11 @@ abstract class ExportShellDebugKey : DefaultTask() {
     }
 }
 
-val debugSigning = android.signingConfigs.getByName("debug")
 val exportShellDebugKey by tasks.registering(ExportShellDebugKey::class) {
-    dependsOn("validateSigningDebug")
-    storeFile.fileValue(debugSigning.storeFile)
-    storePassword.set(debugSigning.storePassword)
-    keyPassword.set(debugSigning.keyPassword)
-    keyAlias.set(debugSigning.keyAlias)
+    storeFile.set(layout.projectDirectory.file("signing/shell-debug.keystore"))
+    storePassword.set("android")
+    keyPassword.set("android")
+    keyAlias.set("androiddebugkey")
     destination.set(layout.buildDirectory.dir("generated/shellDebugAssets"))
 }
 androidComponents.onVariants { variant ->
