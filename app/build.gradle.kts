@@ -109,15 +109,20 @@ val shellJava = tasks.register<JavaCompile>("compileShellActivity") {
     options.encoding = "UTF-8"
     destinationDirectory.set(layout.buildDirectory.dir("intermediates/shellJava"))
 }
-val shellDex = tasks.register<JavaExec>("dexShellActivity") {
+abstract class ShellDex : JavaExec() {
+    @get:OutputDirectory
+    abstract val destinationDirectory: DirectoryProperty
+}
+
+val shellDex = tasks.register<ShellDex>("dexShellActivity") {
     val sdk = androidComponents.sdkComponents.sdkDirectory
     val r8 = sdk.map { it.file("build-tools/37.0.0/lib/d8.jar") }
     val classes = shellJava.flatMap { it.destinationDirectory }
-    val output = layout.buildDirectory.dir("generated/shellDexAssets")
+    destinationDirectory.set(layout.buildDirectory.dir("generated/shellDexAssets"))
+    val output = destinationDirectory
     classpath = files(r8)
     mainClass.set("com.android.tools.r8.D8")
     inputs.files(classes, shellAndroidJar)
-    outputs.dir(output)
     doFirst(CreateShellDexDirectory(output))
     run {
         val destination = output.get().asFile
@@ -127,12 +132,9 @@ val shellDex = tasks.register<JavaExec>("dexShellActivity") {
     }
 }
 androidComponents.onVariants { variant ->
-    variant.sources.assets?.addStaticSourceDirectory(
-        layout.buildDirectory.dir("generated/shellDexAssets").get().asFile.absolutePath
-    )
+    variant.sources.assets?.addGeneratedSourceDirectory(shellDex, ShellDex::destinationDirectory)
 }
-tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }
-    .configureEach { dependsOn(shellDex) }
+
 dependencies {
     implementation("com.android.tools.build:apksig:9.3.3")
     implementation(platform(libs.androidx.compose.bom))
