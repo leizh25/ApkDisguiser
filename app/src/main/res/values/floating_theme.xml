@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.APK.Floating" parent="android:style/Theme.Material.Light.Dialog.NoActionBar">
+        <item name="android:windowMinWidthMajor">85%</item>
+        <item name="android:windowMinWidthMinor">94%</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+    </style>
+</resources>
