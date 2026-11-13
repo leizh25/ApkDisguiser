@@ -2,13 +2,13 @@ name: Publish APK
 
 on:
   push:
-    branches: [master]
+    branches: [main]
 
 permissions:
   contents: write
 
 concurrency:
-  group: publish-master-apk
+  group: publish-main-apk
   queue: max
 
 jobs:
