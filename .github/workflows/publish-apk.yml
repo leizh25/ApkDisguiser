@@ -25,7 +25,16 @@ jobs:
           java-version: '25'
 
       - name: Install Android SDK packages
-        run: sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$sdkmanager" ]]; then
+            sdkmanager=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' -print -quit)
+          fi
+          if [[ ! -x "$sdkmanager" ]]; then
+            echo "::error::Android SDK command-line tools are missing under $ANDROID_HOME."
+            exit 1
+          fi
+          "$sdkmanager" --sdk_root="$ANDROID_HOME" "platforms;android-37.0" "build-tools;37.0.0"
 
       - name: Prepare debug signing key
         env:
