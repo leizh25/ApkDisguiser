@@ -26,7 +26,7 @@ internal object ShellApk {
         return KeyStore.PrivateKeyEntry(key, arrayOf(certificate))
     }
 
-    fun create(context: Context, app: CatalogApp, key: KeyStore.PrivateKeyEntry): File {
+    fun create(context: Context, app: CatalogApp, key: KeyStore.PrivateKeyEntry, icon: android.graphics.Bitmap? = null): File {
         require(app.id.length <= 223 && packagePattern.matches(app.id)) { "包名无效" }
         val directory = File(context.cacheDir, "apks").apply { mkdirs() }
         // Some system installers read the content URI after the activity result returns.
@@ -36,8 +36,23 @@ internal object ShellApk {
         val signed = File.createTempFile("shell-", ".apk", directory)
         try {
             ZipOutputStream(unsigned.outputStream()).use { zip ->
+                if (icon != null) {
+                    val table = context.assets.open("shell-icon.arsc").use { it.readBytes() }
+                    // First ZIP entry: 30-byte header + 14-byte filename gives aligned resource data.
+                    val entry = ZipEntry("resources.arsc").apply {
+                        method = ZipEntry.STORED
+                        size = table.size.toLong()
+                        crc = java.util.zip.CRC32().apply { update(table) }.value
+                    }
+                    zip.putNextEntry(entry)
+                    zip.write(table)
+                    zip.closeEntry()
+                    zip.putNextEntry(ZipEntry("res/drawable-nodpi-v4/shell_icon.png"))
+                    check(icon.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, zip))
+                    zip.closeEntry()
+                }
                 zip.putNextEntry(ZipEntry("AndroidManifest.xml"))
-                zip.write(manifest(app.id, app.name.take(32767)))
+                zip.write(manifest(app.id, app.name.take(32767), icon != null))
                 zip.closeEntry()
                 zip.putNextEntry(ZipEntry("classes.dex"))
                 context.assets.open("classes.dex").use { it.copyTo(zip) }
@@ -64,9 +79,9 @@ internal object ShellApk {
     }
 
     // Android's binary XML format. Resource-backed attribute names occupy the first string indices.
-    internal fun manifest(packageName: String, label: String): ByteArray {
+    internal fun manifest(packageName: String, label: String, hasIcon: Boolean = false): ByteArray {
         val attributes = linkedMapOf(
-            "label" to 0x01010001, "name" to 0x01010003, "exported" to 0x01010010,
+            "icon" to 0x01010002, "label" to 0x01010001, "name" to 0x01010003, "exported" to 0x01010010,
             "minSdkVersion" to 0x0101020c, "versionCode" to 0x0101021b,
             "targetSdkVersion" to 0x01010270
         )
@@ -106,6 +121,7 @@ internal object ShellApk {
                 attr("targetSdkVersion", 16, 35)) +
                 element("uses-permission", string("name", "android.permission.REQUEST_DELETE_PACKAGES")) +
                 element("application", string("label", label),
+                    *if (hasIcon) arrayOf(attr("icon", 1, 0x7f010000)) else emptyArray(),
                     children = element("activity", string("name", activityName),
                         attr("exported", 18, -1), children = element("intent-filter",
                             children = element("action", string("name", "android.intent.action.MAIN")) +

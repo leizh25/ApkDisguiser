@@ -78,6 +78,7 @@ open class MainActivity : ComponentActivity() {
     private val catalog = Catalog()
     private val storage by lazy { getSharedPreferences("installations", MODE_PRIVATE) }
     private var history by mutableStateOf(emptyList<String>())
+    private var embedIcon by mutableStateOf(false)
     private var rootGranted by mutableStateOf(false)
     private var uninstallTarget by mutableStateOf<CatalogApp?>(null)
     private var records by mutableStateOf(emptyList<Record>())
@@ -102,6 +103,7 @@ open class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        embedIcon = storage.getBoolean("embedIcon", false)
         if (savedInstanceState == null) {
             storage.edit().remove("permissionSelection").apply()
         }
@@ -122,6 +124,7 @@ open class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        embedIcon = storage.getBoolean("embedIcon", false)
         refresh()
     }
 
@@ -189,6 +192,7 @@ open class MainActivity : ComponentActivity() {
         busy = true
         val data = JSONObject().put("id", app.id).put("name", app.name).put("icon", app.iconUrl)
         val useRoot = rootGranted
+        val includeIcon = embedIcon
         if (!useRoot && Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
             storage.edit().putString("permissionSelection", data.toString()).apply()
             try {
@@ -205,7 +209,8 @@ open class MainActivity : ComponentActivity() {
             try {
                 val (apk, certificate) = withContext(Dispatchers.IO) {
                     val key = ShellApk.signingKey(this@MainActivity)
-                    ShellApk.create(this@MainActivity, app, key) to Signature(key.certificate.encoded)
+                    val icon = if (includeIcon && app.iconUrl.isNotBlank()) fetchIcon(app.iconUrl) else null
+                    ShellApk.create(this@MainActivity, app, key, icon) to Signature(key.certificate.encoded)
                 }
                 generated = apk
 
@@ -263,6 +268,7 @@ open class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun Home() {
+        var showSettings by rememberSaveable { mutableStateOf(false) }
         var selectedTab by rememberSaveable { mutableIntStateOf(0) }
         val tab = if (floatingSearch) 0 else selectedTab
         val searchFocus = remember { FocusRequester() }
@@ -277,9 +283,10 @@ open class MainActivity : ComponentActivity() {
         var retry by remember { mutableIntStateOf(0) }
         var results by remember { mutableStateOf(emptyList<CatalogApp>()) }
         var status by remember { mutableStateOf(SearchStatus.Idle) }
-        val snackbar = remember { SnackbarHostState() }
         LaunchedEffect(message) {
-            message?.let { snackbar.showSnackbar(it); message = null }
+            val text = message ?: return@LaunchedEffect
+            android.widget.Toast.makeText(this@MainActivity, text, android.widget.Toast.LENGTH_SHORT).show()
+            message = null
         }
         LaunchedEffect(query.trim(), retry) {
             val keyword = query.trim()
@@ -305,7 +312,9 @@ open class MainActivity : ComponentActivity() {
             AlertDialog(
                 onDismissRequest = { uninstallTarget = null },
                 title = { Text("确认卸载") },
-                text = { Text("名称：${app.name}\n包名：${app.id}") },
+                text = {
+                    Text("名称：${app.name}\n包名：${app.id}")
+                },
                 dismissButton = { TextButton(onClick = { uninstallTarget = null }) { Text("取消") } },
                 confirmButton = {
                     TextButton(onClick = {
@@ -329,6 +338,34 @@ open class MainActivity : ComponentActivity() {
             )
         }
 
+        if (showSettings && !floatingSearch) {
+            AlertDialog(
+                onDismissRequest = { showSettings = false },
+                title = { Text("设置") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("嵌入 APP 图标", Modifier.weight(1f))
+                            Switch(checked = embedIcon, onCheckedChange = { checked ->
+                                embedIcon = checked
+                                storage.edit().putBoolean("embedIcon", checked).apply()
+                            })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("悬浮窗", Modifier.weight(1f))
+                            Switch(checked = FloatingSearchService.isShowing, onCheckedChange = { checked ->
+                                if (checked) {
+                                    enableFloatingButton()
+                                } else {
+                                    stopService(Intent(this@MainActivity, FloatingSearchService::class.java))
+                                }
+                            })
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showSettings = false }) { Text("完成") } }
+            )
+        }
         Scaffold(
             modifier = if (floatingSearch) Modifier.fillMaxWidth().heightIn(min = 250.dp, max = 450.dp) else Modifier,
             topBar = {
@@ -336,20 +373,10 @@ open class MainActivity : ComponentActivity() {
                     if (floatingSearch) {
                         TextButton(onClick = { finish() }) { Text("关闭") }
                     } else {
-                        val showing = FloatingSearchService.isShowing
-                        TextButton(onClick = {
-                            if (showing) {
-                                stopService(Intent(this@MainActivity, FloatingSearchService::class.java))
-                            } else {
-                                enableFloatingButton()
-                            }
-                        }) {
-                            Text(if (showing) "关闭悬浮搜索" else "打开悬浮按钮")
-                        }
+                        TextButton(onClick = { keyboard?.hide(); showSettings = true }) { Text("设置") }
                     }
                 })
             },
-            snackbarHost = { SnackbarHost(snackbar) }
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
                 if (!floatingSearch) PrimaryTabRow(selectedTabIndex = tab) {

@@ -31,4 +31,24 @@ class ShellApkTest {
             apk.delete()
         }
     }
+    @Test
+    fun systemLoadsEmbeddedLauncherIcon() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(android.graphics.Color.MAGENTA)
+        val apk = ShellApk.create(context, CatalogApp("me.leizh25.shellfixture", "测试空壳"),
+            ShellApk.signingKey(context), bitmap)
+        try {
+            val manager = context.packageManager
+            val info = checkNotNull(manager.getPackageArchiveInfo(apk.absolutePath, 0)).applicationInfo!!
+            info.sourceDir = apk.absolutePath
+            info.publicSourceDir = apk.absolutePath
+            val drawable = manager.getDrawable(info.packageName, info.icon, info)
+                as android.graphics.drawable.BitmapDrawable
+            assertEquals(android.graphics.Color.MAGENTA, drawable.bitmap.getPixel(0, 0))
+        } finally {
+            apk.delete()
+            bitmap.recycle()
+        }
+    }
 }

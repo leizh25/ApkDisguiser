@@ -96,7 +96,7 @@ val releaseDate = providers.gradleProperty("releaseDate").orElse(
 androidComponents.onVariants(androidComponents.selector().withBuildType("release")) { variant ->
     variant.outputs.forEach { output ->
         output.outputFileName.set(output.versionName.zip(releaseDate) { version, date ->
-            "ApkDisguiser-v$version-$date.apk"
+            "ApkDisguiser-v$version-arm64-$date.apk"
         })
     }
 }
