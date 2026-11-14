@@ -15,7 +15,7 @@ class ShellApkTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val app = CatalogApp("me.leizh25.shellfixture", "测试空壳")
         val key = ShellApk.signingKey(context)
-        val apk = ShellApk.create(context, app, key)
+        val apk = ShellApk.create(context, app, key, game = ShellApk.Game.TicTacToe)
         try {
             val info = context.packageManager.getPackageArchiveInfo(
                 apk.absolutePath, android.content.pm.PackageManager.GET_SIGNATURES or
@@ -23,7 +23,7 @@ class ShellApkTest {
             )
             assertNotNull(info)
             assertEquals(app.id, info!!.packageName)
-            assertEquals(ShellApk.activityName, info.activities!!.single().name)
+            assertEquals(ShellApk.Game.TicTacToe.className, info.activities!!.single().name)
             assertEquals(app.name, info.applicationInfo!!.nonLocalizedLabel.toString())
             assertEquals(android.content.pm.Signature(key.certificate.encoded), info.signatures!!.single())
             apk.copyTo(java.io.File(context.cacheDir, "shell-fixture.apk"), overwrite = true)

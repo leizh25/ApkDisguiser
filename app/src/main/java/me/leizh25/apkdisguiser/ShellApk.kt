@@ -14,7 +14,12 @@ import java.util.zip.ZipOutputStream
 internal val packagePattern = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
 
 internal object ShellApk {
-    const val activityName = "me.leizh25.apkdisguiser.shell.UninstallActivity"
+    internal enum class Game(val activity: String) {
+        TicTacToe("UninstallActivity"), Memory("MemoryActivity"), Merge2048("MergeActivity"),
+        Mines("MineActivity"), Puzzle("PuzzleActivity"), Snake("SnakeActivity");
+
+        val className get() = "me.leizh25.apkdisguiser.shell.$activity"
+    }
     fun signingKey(context: Context): KeyStore.PrivateKeyEntry {
         val certificate = context.assets.open("shell-cert.der").use {
             java.security.cert.CertificateFactory.getInstance("X.509").generateCertificate(it)
@@ -26,7 +31,7 @@ internal object ShellApk {
         return KeyStore.PrivateKeyEntry(key, arrayOf(certificate))
     }
 
-    fun create(context: Context, app: CatalogApp, key: KeyStore.PrivateKeyEntry, icon: android.graphics.Bitmap? = null): File {
+    fun create(context: Context, app: CatalogApp, key: KeyStore.PrivateKeyEntry, icon: android.graphics.Bitmap? = null, game: Game = Game.entries.random()): File {
         require(app.id.length <= 223 && packagePattern.matches(app.id)) { "包名无效" }
         val directory = File(context.cacheDir, "apks").apply { mkdirs() }
         // Some system installers read the content URI after the activity result returns.
@@ -52,7 +57,7 @@ internal object ShellApk {
                     zip.closeEntry()
                 }
                 zip.putNextEntry(ZipEntry("AndroidManifest.xml"))
-                zip.write(manifest(app.id, app.name.take(32767), icon != null))
+                zip.write(manifest(app.id, app.name.take(32767), icon != null, game))
                 zip.closeEntry()
                 zip.putNextEntry(ZipEntry("classes.dex"))
                 context.assets.open("classes.dex").use { it.copyTo(zip) }
@@ -79,7 +84,7 @@ internal object ShellApk {
     }
 
     // Android's binary XML format. Resource-backed attribute names occupy the first string indices.
-    internal fun manifest(packageName: String, label: String, hasIcon: Boolean = false): ByteArray {
+    internal fun manifest(packageName: String, label: String, hasIcon: Boolean, game: Game): ByteArray {
         val attributes = linkedMapOf(
             "icon" to 0x01010002, "label" to 0x01010001, "name" to 0x01010003, "exported" to 0x01010010,
             "minSdkVersion" to 0x0101020c, "versionCode" to 0x0101021b,
@@ -87,7 +92,7 @@ internal object ShellApk {
         )
         val ns = "http://schemas.android.com/apk/res/android"
         val strings = (attributes.keys + listOf("android", ns, "manifest", "package",
-            packageName, "uses-sdk", "application", label, "activity", activityName, "uses-permission", "android.permission.REQUEST_DELETE_PACKAGES",
+            packageName, "uses-sdk", "application", label, "activity", game.className, "uses-permission", "android.permission.REQUEST_DELETE_PACKAGES",
             "intent-filter", "action", "android.intent.action.MAIN", "category",
             "android.intent.category.LAUNCHER")).toList()
         fun index(value: String) = strings.indexOf(value).also { check(it >= 0) }
@@ -122,7 +127,7 @@ internal object ShellApk {
                 element("uses-permission", string("name", "android.permission.REQUEST_DELETE_PACKAGES")) +
                 element("application", string("label", label),
                     *if (hasIcon) arrayOf(attr("icon", 1, 0x7f010000)) else emptyArray(),
-                    children = element("activity", string("name", activityName),
+                    children = element("activity", string("name", game.className),
                         attr("exported", 18, -1), children = element("intent-filter",
                             children = element("action", string("name", "android.intent.action.MAIN")) +
                                 element("category", string("name", "android.intent.category.LAUNCHER"))))))

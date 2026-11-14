@@ -129,9 +129,12 @@ val shellDex = tasks.register<ShellDex>("dexShellActivity") {
     doFirst(CreateShellDexDirectory(output))
     run {
         val destination = output.get().asFile
-        val compiled = classes.get().file("me/leizh25/apkdisguiser/shell/UninstallActivity.class")
+        val compiled = listOf("UninstallActivity", "MemoryActivity", "MergeActivity", "MineActivity", "PuzzleActivity", "SnakeActivity").map {
+            classes.get().file("me/leizh25/apkdisguiser/shell/$it.class").asFile.absolutePath
+        }
         args("--min-api", "24", "--lib", shellAndroidJar.get().asFile.absolutePath,
-            "--output", destination.absolutePath, compiled.asFile.absolutePath)
+            "--output", destination.absolutePath)
+        args(compiled)
     }
 }
 androidComponents.onVariants { variant ->

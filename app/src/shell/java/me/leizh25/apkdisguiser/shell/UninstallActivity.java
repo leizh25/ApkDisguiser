@@ -17,7 +17,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 
-public final class UninstallActivity extends Activity {
+public class UninstallActivity extends Activity {
     private static final long STARTED_AT = SystemClock.elapsedRealtime();
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView runtime;
@@ -48,7 +48,7 @@ public final class UninstallActivity extends Activity {
         scroll.setFillViewport(true);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setGravity(Gravity.CENTER_HORIZONTAL);
+        content.setGravity(Gravity.CENTER);
         content.setPadding(dp(20), dp(16), dp(20), dp(16));
         scroll.addView(content);
         LinearLayout page = new LinearLayout(this);
@@ -64,16 +64,24 @@ public final class UninstallActivity extends Activity {
         runtime.setGravity(Gravity.END);
         runtime.setTextSize(12);
         runtime.setTextColor(0xff494567);
-        content.addView(runtime, new LinearLayout.LayoutParams(-1, -2));
+        runtime.setBackgroundColor(0xfff8f7ff);
+        runtime.setPadding(dp(16), dp(8), dp(16), 0);
+        page.addView(runtime, new LinearLayout.LayoutParams(-1, -2));
 
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+        setContentView(page);
+        buildGame(content, state);
+    }
+
+    protected void buildGame(LinearLayout content, Bundle state) {
         TextView title = new TextView(this);
         title.setText("井字棋");
         title.setTextSize(28);
         title.setTextColor(0xff24204c);
         title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        title.setPadding(0, dp(20), 0, 0);
+        title.setPadding(0, 0, 0, 0);
         content.addView(title);
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+
         status = new TextView(this);
         status.setTextColor(0xff494567);
         status.setPadding(0, dp(6), 0, dp(12));
@@ -104,7 +112,6 @@ public final class UninstallActivity extends Activity {
         restart.setOnClickListener(view -> restartGame());
         content.addView(restart);
 
-        setContentView(page);
         renderBoard();
     }
 
@@ -169,7 +176,42 @@ public final class UninstallActivity extends Activity {
             .show();
     }
 
-    private int dp(int value) {
+    protected void addDirectionPad(LinearLayout content, java.util.function.IntConsumer onDirection) {
+        String[] arrows = {"↑", "←", "→", "↓"};
+        String[] labels = {"上", "左", "右", "下"};
+        int[] rows = {0, 1, 1, 2};
+        int[] columns = {1, 0, 2, 1};
+        android.widget.GridLayout pad = new android.widget.GridLayout(this);
+        pad.setColumnCount(3);
+        pad.setRowCount(3);
+        for (int i = 0; i < arrows.length; i++) {
+            int direction = i;
+            Button button = new Button(this);
+            button.setText(arrows[i]);
+            button.setContentDescription(labels[i]);
+            button.setTextSize(22);
+            button.setTextColor(0xff4738a1);
+            button.setPadding(0, 0, 0, 0);
+            GradientDrawable background = new GradientDrawable();
+            background.setColor(0xffe4ddff);
+            background.setCornerRadius(dp(14));
+            button.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x334738a1), background, null));
+            button.setOnClickListener(view -> onDirection.accept(direction));
+            android.widget.GridLayout.LayoutParams cell = new android.widget.GridLayout.LayoutParams(
+                android.widget.GridLayout.spec(rows[i]), android.widget.GridLayout.spec(columns[i]));
+            cell.width = dp(48);
+            cell.height = dp(48);
+            cell.setMargins(dp(2), dp(2), dp(2), dp(2));
+            pad.addView(button, cell);
+        }
+        LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(-2, -2);
+        layout.topMargin = dp(10);
+        layout.bottomMargin = dp(8);
+        content.addView(pad, layout);
+    }
+
+    protected int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
@@ -254,6 +296,7 @@ public final class UninstallActivity extends Activity {
     protected void onResume() {
         super.onResume();
         updateRuntime();
+        if (status == null) return;
         showResult();
         if (computerDue != 0) {
             handler.postDelayed(computer, Math.max(0, computerDue - SystemClock.elapsedRealtime()));
