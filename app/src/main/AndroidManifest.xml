@@ -35,7 +35,7 @@
                 android:value="User-enabled floating app search button" />
         </service>
         <activity android:name=".FloatingSearchActivity" android:exported="false"
-            android:excludeFromRecents="true" android:taskAffinity="me.leizh25.apkdisguiser.floating"
+            android:excludeFromRecents="true" android:taskAffinity="${applicationId}.floating"
             android:theme="@style/Theme.APK.Floating" android:windowSoftInputMode="adjustResize" />
         <provider
             android:name="androidx.core.content.FileProvider"

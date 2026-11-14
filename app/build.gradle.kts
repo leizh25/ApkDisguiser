@@ -40,6 +40,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".test"
+        }
         release {
             signingConfig = signingConfigs.getByName("release")
             optimization {
