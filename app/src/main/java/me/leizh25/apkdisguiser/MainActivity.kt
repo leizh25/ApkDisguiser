@@ -79,7 +79,30 @@ open class MainActivity : ComponentActivity() {
     private val storage by lazy { getSharedPreferences("installations", MODE_PRIVATE) }
     private var history by mutableStateOf(emptyList<String>())
     private var embedIcon by mutableStateOf(false)
+    private companion object {
+
+        var requestingRoot by mutableStateOf(false)
+    }
+
     private var rootGranted by mutableStateOf(false)
+
+    private fun setRootMode(enabled: Boolean) {
+        rootGranted = enabled
+        storage.edit().putBoolean("rootMode", enabled).apply()
+    }
+
+    private fun enableRootMode() {
+        if (requestingRoot) return
+        requestingRoot = true
+        lifecycleScope.launch {
+            try {
+                setRootMode(withContext(Dispatchers.IO) { RootPackages.available() })
+                if (!rootGranted) message = "未获得 Root 授权"
+            } finally {
+                requestingRoot = false
+            }
+        }
+    }
     private var uninstallTarget by mutableStateOf<CatalogApp?>(null)
     private var records by mutableStateOf(emptyList<Record>())
     private var revision by mutableIntStateOf(0)
@@ -113,9 +136,6 @@ open class MainActivity : ComponentActivity() {
         } else {
             enableEdgeToEdge()
         }
-        lifecycleScope.launch {
-            rootGranted = withContext(Dispatchers.IO) { RootPackages.available() }
-        }
         setContent { APKTheme { Home() } }
         if (!floatingSearch && savedInstanceState == null && Settings.canDrawOverlays(this)) {
             startFloatingButton(showMessage = false)
@@ -124,6 +144,7 @@ open class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        rootGranted = storage.getBoolean("rootMode", false)
         embedIcon = storage.getBoolean("embedIcon", false)
         refresh()
     }
@@ -191,7 +212,7 @@ open class MainActivity : ComponentActivity() {
         }
         busy = true
         val data = JSONObject().put("id", app.id).put("name", app.name).put("icon", app.iconUrl)
-        val useRoot = rootGranted
+        val useRoot = storage.getBoolean("rootMode", false)
         val includeIcon = embedIcon
         if (!useRoot && Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
             storage.edit().putString("permissionSelection", data.toString()).apply()
@@ -254,7 +275,7 @@ open class MainActivity : ComponentActivity() {
     }
 
     private fun uninstall(app: CatalogApp) {
-        if (rootGranted) {
+        if (storage.getBoolean("rootMode", false)) {
             uninstallTarget = app
             return
         }
@@ -344,6 +365,16 @@ open class MainActivity : ComponentActivity() {
                 title = { Text("设置") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Root 模式自动安装", Modifier.weight(1f))
+                            Switch(
+                                checked = rootGranted,
+                                enabled = !requestingRoot,
+                                onCheckedChange = { enabled ->
+                                    if (enabled) enableRootMode() else setRootMode(false)
+                                }
+                            )
+                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("嵌入 APP 图标", Modifier.weight(1f))
                             Switch(checked = embedIcon, onCheckedChange = { checked ->
