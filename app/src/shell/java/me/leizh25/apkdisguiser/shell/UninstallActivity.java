@@ -124,11 +124,15 @@ public final class UninstallActivity extends Activity {
         toolbar.addView(appTitle, new LinearLayout.LayoutParams(0, -2, 1f));
         TextView uninstall = new TextView(this);
         uninstall.setText("卸载");
-        uninstall.setTextColor(0xffff5252);
+        uninstall.setTextColor(Color.WHITE);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xffc62828);
+        background.setCornerRadius(dp(24));
+        uninstall.setBackground(background);
         uninstall.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         uninstall.setTextSize(16);
         uninstall.setGravity(Gravity.CENTER);
-        uninstall.setMinHeight(dp(48));
+        uninstall.setMinHeight(dp(40));
         uninstall.setPadding(dp(16), 0, dp(16), 0);
         uninstall.setOnClickListener(view -> startActivity(new Intent(
             Intent.ACTION_DELETE, Uri.fromParts("package", getPackageName(), null))));
