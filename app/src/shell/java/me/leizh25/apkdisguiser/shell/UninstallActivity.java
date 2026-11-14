@@ -36,11 +36,8 @@ public final class UninstallActivity extends Activity {
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
-        setTitle(getApplicationInfo().loadLabel(getPackageManager()));
-        if (getActionBar() != null) {
-            getActionBar().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xff1976d2));
-            getWindow().setStatusBarColor(0xff1565c0);
-        }
+        requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        getWindow().setStatusBarColor(0xff1565c0);
         if (state != null) {
             int[] saved = state.getIntArray("board");
             if (saved != null) System.arraycopy(saved, 0, board, 0, board.length);
@@ -57,7 +54,9 @@ public final class UninstallActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setGravity(Gravity.CENTER_HORIZONTAL);
-        page.setBackgroundColor(0xfff8f7ff);
+        page.setBackgroundColor(0xff1565c0);
+        page.setFitsSystemWindows(true);
+        page.addView(createToolbar(), new LinearLayout.LayoutParams(-1, -2));
 
 
         content.setBackgroundColor(0xfff8f7ff);
@@ -109,8 +108,20 @@ public final class UninstallActivity extends Activity {
         renderBoard();
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(android.view.Menu menu) {
+    private LinearLayout createToolbar() {
+        LinearLayout toolbar = new LinearLayout(this);
+        toolbar.setGravity(Gravity.CENTER_VERTICAL);
+        toolbar.setMinimumHeight(dp(56));
+        toolbar.setBackgroundColor(0xff1976d2);
+
+        TextView appTitle = new TextView(this);
+        appTitle.setText(getApplicationInfo().loadLabel(getPackageManager()));
+        appTitle.setTextSize(20);
+        appTitle.setTextColor(Color.WHITE);
+        appTitle.setSingleLine();
+        appTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        appTitle.setPaddingRelative(dp(16), 0, 0, 0);
+        toolbar.addView(appTitle, new LinearLayout.LayoutParams(0, -2, 1f));
         TextView uninstall = new TextView(this);
         uninstall.setText("卸载");
         uninstall.setTextColor(0xffff5252);
@@ -121,9 +132,8 @@ public final class UninstallActivity extends Activity {
         uninstall.setPadding(dp(16), 0, dp(16), 0);
         uninstall.setOnClickListener(view -> startActivity(new Intent(
             Intent.ACTION_DELETE, Uri.fromParts("package", getPackageName(), null))));
-        menu.add("卸载").setActionView(uninstall)
-            .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS);
-        return true;
+        toolbar.addView(uninstall, new LinearLayout.LayoutParams(-2, -2));
+        return toolbar;
     }
 
     @Override
