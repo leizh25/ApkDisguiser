@@ -13,6 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -124,6 +125,58 @@ open class MainActivity : ComponentActivity() {
         }
     }
 
+    private var checkingUpdate by mutableStateOf(false)
+    private var latestUpdate by mutableStateOf<AppUpdates.Release?>(null)
+    private var availableUpdate by mutableStateOf<AppUpdates.Release?>(null)
+    private val isReleaseBuild get() = packageName == "me.leizh25.apkdisguiser"
+
+    @Suppress("DEPRECATION")
+    private fun checkForUpdate(manual: Boolean) {
+        if (checkingUpdate) return
+        val now = System.currentTimeMillis()
+        val last = storage.getLong("lastUpdateCheck", 0)
+        if (!manual && now - last in 0 until 86_400_000L) return
+        checkingUpdate = true
+        storage.edit().putLong("lastUpdateCheck", now).apply()
+        lifecycleScope.launch {
+            try {
+                val release = withContext(Dispatchers.IO) { AppUpdates.latest() }
+                val installed = packageManager.getPackageInfo(packageName, 0)
+                val versionCode = androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(installed)
+                if (release != null && release.versionCode > versionCode) {
+                    latestUpdate = release
+                    availableUpdate = release
+                } else {
+                    latestUpdate = null
+                    if (manual)
+                    message = if (release == null) "暂无正式发布版本" else "当前已是最新版本"
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: AppUpdates.MissingManifest) {
+                if (manual) message = "最新发布缺少更新清单"
+            } catch (_: Exception) {
+                if (manual) message = "无法检查更新，请稍后重试"
+            } finally {
+                checkingUpdate = false
+            }
+        }
+    }
+
+    private fun downloadUpdate(update: AppUpdates.Release) {
+        try {
+            val request = android.app.DownloadManager.Request(Uri.parse(update.apkUrl))
+                .setTitle("APK 伪装器 ${update.versionName}")
+                .setMimeType("application/vnd.android.package-archive")
+                .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            getSystemService(android.app.DownloadManager::class.java).enqueue(request)
+            message = "已开始下载"
+            availableUpdate = null
+        } catch (_: RuntimeException) {
+            message = "无法启动系统下载"
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         embedIcon = storage.getBoolean("embedIcon", false)
@@ -137,6 +190,7 @@ open class MainActivity : ComponentActivity() {
             enableEdgeToEdge()
         }
         setContent { APKTheme { Home() } }
+        if (!floatingSearch) checkForUpdate(manual = false)
         if (!floatingSearch && savedInstanceState == null && Settings.canDrawOverlays(this)) {
             startFloatingButton(showMessage = false)
         }
@@ -359,7 +413,29 @@ open class MainActivity : ComponentActivity() {
             )
         }
 
-        if (showSettings && !floatingSearch) {
+        availableUpdate?.let { update ->
+            AlertDialog(
+                onDismissRequest = { availableUpdate = null },
+                title = { Text("发现新版本") },
+                text = {
+                    val notes = update.notes.ifBlank { "暂无更新日志。" }
+                    val description = if (isReleaseBuild) notes else "此更新下载正式版 APK。\n\n$notes"
+                    Text(description,
+                        Modifier.heightIn(max = 280.dp)
+                            .verticalScroll(androidx.compose.foundation.rememberScrollState()))
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        downloadUpdate(update)
+                    }) { Text("更新") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { availableUpdate = null }) { Text("取消") }
+                }
+            )
+        }
+
+        if (showSettings && !floatingSearch && availableUpdate == null) {
             AlertDialog(
                 onDismissRequest = { showSettings = false },
                 title = { Text("设置") },
@@ -392,6 +468,41 @@ open class MainActivity : ComponentActivity() {
                                 }
                             })
                         }
+                        HorizontalDivider()
+                        val version = remember {
+                            packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+                        }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("当前版本 V$version", Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall)
+                            val update = latestUpdate
+                            TextButton(
+                                onClick = {
+                                    if (update == null) checkForUpdate(manual = true)
+                                    else downloadUpdate(update)
+                                },
+                                enabled = !checkingUpdate,
+                                contentPadding = PaddingValues(horizontal = 6.dp)
+                            ) {
+                                Text(when {
+                                    checkingUpdate -> "检测中…"
+                                    update != null -> "新版本V${update.versionName}"
+                                    else -> "检测更新"
+                                })
+                            }
+                        }
+                        val sourceUrl = "https://github.com/leizh25/ApkDisguiser"
+                        Text("开源地址 $sourceUrl",
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                try {
+                                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(sourceUrl)))
+                                } catch (_: android.content.ActivityNotFoundException) {
+                                    message = "无法打开开源地址"
+                                }
+                            }.padding(vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodySmall)
                     }
                 },
                 confirmButton = { TextButton(onClick = { showSettings = false }) { Text("完成") } }
