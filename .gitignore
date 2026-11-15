@@ -15,4 +15,4 @@ local.properties
 *.keystore
 *.jks
 *.p12
-!/app/signing/shell-debug.keystore
+!/app/signing/shell-release.keystore

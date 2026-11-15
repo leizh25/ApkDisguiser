@@ -59,7 +59,7 @@ android {
     }
 }
 
-abstract class ExportShellDebugKey : DefaultTask() {
+abstract class ExportShellSigningKey : DefaultTask() {
     @get:InputFile abstract val storeFile: RegularFileProperty
     @get:Input abstract val storePassword: Property<String>
     @get:Input abstract val keyPassword: Property<String>
@@ -76,15 +76,15 @@ abstract class ExportShellDebugKey : DefaultTask() {
     }
 }
 
-val exportShellDebugKey by tasks.registering(ExportShellDebugKey::class) {
-    storeFile.set(layout.projectDirectory.file("signing/shell-debug.keystore"))
+val exportShellSigningKey by tasks.registering(ExportShellSigningKey::class) {
+    storeFile.set(layout.projectDirectory.file("signing/shell-release.keystore"))
     storePassword.set("android")
     keyPassword.set("android")
-    keyAlias.set("androiddebugkey")
+    keyAlias.set("shell-release")
     destination.set(layout.buildDirectory.dir("generated/shellDebugAssets"))
 }
 androidComponents.onVariants { variant ->
-    variant.sources.assets?.addGeneratedSourceDirectory(exportShellDebugKey, ExportShellDebugKey::destination)
+    variant.sources.assets?.addGeneratedSourceDirectory(exportShellSigningKey, ExportShellSigningKey::destination)
 }
 class CreateShellDexDirectory(private val directory: Provider<Directory>) : Action<Task> {
     override fun execute(task: Task) {
