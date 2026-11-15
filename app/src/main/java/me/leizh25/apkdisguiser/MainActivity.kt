@@ -15,6 +15,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -128,7 +130,6 @@ open class MainActivity : ComponentActivity() {
     private var checkingUpdate by mutableStateOf(false)
     private var latestUpdate by mutableStateOf<AppUpdates.Release?>(null)
     private var availableUpdate by mutableStateOf<AppUpdates.Release?>(null)
-    private val isReleaseBuild get() = packageName == "me.leizh25.apkdisguiser"
 
     @Suppress("DEPRECATION")
     private fun checkForUpdate(manual: Boolean) {
@@ -163,12 +164,20 @@ open class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun downloadUpdate(update: AppUpdates.Release) {
+    private fun downloadUpdate(update: AppUpdates.Release, useProxy: Boolean) {
         try {
-            val request = android.app.DownloadManager.Request(Uri.parse(update.apkUrl))
-                .setTitle("APK 伪装器 ${update.versionName}")
+            val url = if (useProxy) "https://v6.gh-proxy.org/${update.apkUrl}" else update.apkUrl
+            val fileName = update.fileName
+            val directory = android.os.Environment.DIRECTORY_DOWNLOADS
+            val request = android.app.DownloadManager.Request(Uri.parse(url))
+                .setTitle(fileName)
                 .setMimeType("application/vnd.android.package-archive")
                 .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            if (Build.VERSION.SDK_INT >= 29) {
+                request.setDestinationInExternalPublicDir(directory, fileName)
+            } else {
+                request.setDestinationInExternalFilesDir(this, directory, fileName)
+            }
             getSystemService(android.app.DownloadManager::class.java).enqueue(request)
             message = "已开始下载"
             availableUpdate = null
@@ -414,23 +423,41 @@ open class MainActivity : ComponentActivity() {
         }
 
         availableUpdate?.let { update ->
+            var useProxy by rememberSaveable(update.apkUrl) { mutableStateOf(true) }
             AlertDialog(
                 onDismissRequest = { availableUpdate = null },
                 title = { Text("发现新版本") },
                 text = {
-                    val notes = update.notes.ifBlank { "暂无更新日志。" }
-                    val description = if (isReleaseBuild) notes else "此更新下载正式版 APK。\n\n$notes"
-                    Text(description,
-                        Modifier.heightIn(max = 280.dp)
+                    val notes = update.notes.ifBlank { "--" }
+                    Column {
+                        val version = update.versionName.takeIf { it.isNotBlank() }?.let { "V$it" } ?: "--"
+                        Text("版本 $version")
+                        val size = update.size?.let { android.text.format.Formatter.formatFileSize(this@MainActivity, it) } ?: "--"
+                        Text("大小 $size", Modifier.padding(bottom = 8.dp))
+                        Text(notes, Modifier.heightIn(max = 280.dp)
                             .verticalScroll(androidx.compose.foundation.rememberScrollState()))
+                    }
                 },
                 confirmButton = {
-                    TextButton(onClick = {
-                        downloadUpdate(update)
-                    }) { Text("更新") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { availableUpdate = null }) { Text("取消") }
+                    Column(Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                                .toggleable(value = useProxy, role = Role.Checkbox,
+                                    onValueChange = { useProxy = it }),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+                                Checkbox(checked = useProxy, onCheckedChange = null)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text("使用GitHub代理链接下载")
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { availableUpdate = null }) { Text("取消") }
+                            Spacer(Modifier.width(8.dp))
+                            TextButton(onClick = { downloadUpdate(update, useProxy) }) { Text("更新") }
+                        }
+                    }
                 }
             )
         }
@@ -480,14 +507,14 @@ open class MainActivity : ComponentActivity() {
                             TextButton(
                                 onClick = {
                                     if (update == null) checkForUpdate(manual = true)
-                                    else downloadUpdate(update)
+                                    else availableUpdate = update
                                 },
                                 enabled = !checkingUpdate,
                                 contentPadding = PaddingValues(horizontal = 6.dp)
                             ) {
                                 Text(when {
                                     checkingUpdate -> "检测中…"
-                                    update != null -> "新版本V${update.versionName}"
+                                    update != null -> update.versionName.takeIf { it.isNotBlank() }?.let { "新版本V$it" } ?: "新版本--"
                                     else -> "检测更新"
                                 })
                             }

@@ -7,7 +7,14 @@ import javax.net.ssl.HttpsURLConnection
 internal object AppUpdates {
     class MissingManifest : Exception()
 
-    data class Release(val versionName: String, val versionCode: Long, val notes: String, val apkUrl: String)
+    data class Release(
+        val versionName: String,
+        val versionCode: Long,
+        val fileName: String,
+        val size: Long?,
+        val notes: String,
+        val apkUrl: String
+    )
 
     fun latest(): Release? {
         val release = fetch("https://api.github.com/repos/leizh25/ApkDisguiser/releases/latest") ?: return null
@@ -15,17 +22,21 @@ internal object AppUpdates {
         require(Regex("v[0-9]+(?:\\.[0-9]+)+-[0-9]{8}").matches(tag))
         val assets = release.getJSONArray("assets")
         val names = (0 until assets.length()).map { assets.getJSONObject(it).getString("name") }
-        val version = tag.substringBeforeLast('-').removePrefix("v")
-        val apk = "ApkDisguiser-${tag.substringBeforeLast('-')}-arm64-${tag.substringAfterLast('-')}.apk"
-        require(apk in names)
+        val tagVersion = tag.substringBeforeLast('-').removePrefix("v")
         if ("update.json" !in names) throw MissingManifest()
         val manifest = checkNotNull(fetch("https://github.com/leizh25/ApkDisguiser/releases/download/$tag/update.json"))
         require(manifest.getString("packageName") == "me.leizh25.apkdisguiser")
-        require(manifest.getString("versionName") == version && manifest.getString("apk") == apk)
+        val apk = manifest.getString("apk")
+        require(Regex("[A-Za-z0-9._-]+\\.apk").matches(apk) && apk in names)
+        val version = manifest.optString("versionName", "").trim()
+        require(version.isEmpty() || version == tagVersion)
+        val size = (manifest.opt("size") as? Number)?.let { bytes ->
+            bytes.toLong().takeIf { it > 0 && it.toDouble() == bytes.toDouble() }
+        }
         val code = manifest.getLong("versionCode")
         require(code in 1..2100000000)
         val notes = release.optString("body").replace(Regex("<!--.*?-->", RegexOption.DOT_MATCHES_ALL), "").trim()
-        return Release(version, code, notes, "https://github.com/leizh25/ApkDisguiser/releases/download/$tag/$apk")
+        return Release(version, code, apk, size, notes, "https://github.com/leizh25/ApkDisguiser/releases/download/$tag/$apk")
     }
 
     private fun fetch(url: String): JSONObject? {
