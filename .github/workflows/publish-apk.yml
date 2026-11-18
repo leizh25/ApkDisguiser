@@ -106,10 +106,11 @@ jobs:
         run: |
           apk="ApkDisguiser-${TAG%-*}-arm64-${TAG##*-}.apk"
           cp "app/build/outputs/apk/release/$apk" "$apk"
-          jq --arg apk "$apk" --argjson size "$(wc -c < "$apk")" --arg updateDate "$(TZ=Asia/Shanghai date +%F)" --arg sha256 "$(sha256sum "$apk" | cut -d ' ' -f 1)" '
+          download_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG/$apk"
+          jq --arg apk "$apk" --arg downloadUrl "$download_url" --argjson size "$(wc -c < "$apk")" --arg updateDate "$(TZ=Asia/Shanghai date +%F)" --arg sha256 "$(sha256sum "$apk" | cut -d ' ' -f 1)" '
             .applicationId as $package |
             .elements[] | select(.outputFile == $apk) |
-            {packageName: $package, versionCode, versionName, apk: $apk, size: $size, updateDate: $updateDate, sha256: $sha256}
+            {packageName: $package, versionCode, versionName, apk: $apk, downloadUrl: $downloadUrl, size: $size, updateDate: $updateDate, sha256: $sha256}
           ' app/build/outputs/apk/release/output-metadata.json > update.json
           test -s update.json
           previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*-[0-9]*'             --match 'build-*' "$GITHUB_SHA" 2>/dev/null || true)

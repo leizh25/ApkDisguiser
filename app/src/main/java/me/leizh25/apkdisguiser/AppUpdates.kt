@@ -1,6 +1,7 @@
 package me.leizh25.apkdisguiser
 
 import org.json.JSONObject
+import java.net.URI
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
@@ -28,6 +29,9 @@ internal object AppUpdates {
         require(manifest.getString("packageName") == "me.leizh25.apkdisguiser")
         val apk = manifest.getString("apk")
         require(Regex("[A-Za-z0-9._-]+\\.apk").matches(apk) && apk in names)
+        val downloadUrl = manifest.getString("downloadUrl")
+        val downloadUri = URI(downloadUrl)
+        require(downloadUri.scheme.equals("https", ignoreCase = true) && downloadUri.host != null)
         val version = manifest.optString("versionName", "").trim()
         require(version.isEmpty() || version == tagVersion)
         val size = (manifest.opt("size") as? Number)?.let { bytes ->
@@ -36,7 +40,7 @@ internal object AppUpdates {
         val code = manifest.getLong("versionCode")
         require(code in 1..2100000000)
         val notes = release.optString("body").replace(Regex("<!--.*?-->", RegexOption.DOT_MATCHES_ALL), "").trim()
-        return Release(version, code, apk, size, notes, "https://github.com/leizh25/ApkDisguiser/releases/download/$tag/$apk")
+        return Release(version, code, apk, size, notes, downloadUrl)
     }
 
     private fun fetch(url: String): JSONObject? {
