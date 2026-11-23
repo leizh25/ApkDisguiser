@@ -120,7 +120,7 @@ open class MainActivity : ComponentActivity() {
         val selected = storage.getString("permissionSelection", null)?.let(::JSONObject)
         storage.edit().remove("permissionSelection").apply()
         if (selected != null && packageManager.canRequestPackageInstalls()) {
-            install(CatalogApp(selected.getString("id"), selected.getString("name"), selected.optString("icon")))
+            install(CatalogApp(selected.getString("id"), selected.getString("name"), selected.optString("icon"), selected.optString("versionName")))
         } else {
             busy = false
             message = "请先允许此应用安装未知应用"
@@ -215,7 +215,7 @@ open class MainActivity : ComponentActivity() {
     private fun refresh() {
         records = storage.all.filterKeys { it.startsWith("record:") }.values.map { value ->
             val json = JSONObject(value as String)
-            Record(CatalogApp(json.getString("id"), json.getString("name"), json.optString("icon")), json.getLong("date"))
+            Record(CatalogApp(json.getString("id"), json.getString("name"), json.optString("icon"), json.optString("versionName")), json.getLong("date"))
         }.sortedByDescending { it.date }
         if (!storage.contains("searchHistory")) {
             saveHistory(records.map { it.app.name })
@@ -240,7 +240,7 @@ open class MainActivity : ComponentActivity() {
         val id = pending.getString("id")
         if (!isShellInstalled(id, Signature(pending.getString("certificate")))) return false
         val record = JSONObject().put("id", id).put("name", pending.getString("name"))
-            .put("date", System.currentTimeMillis()).put("icon", pending.optString("icon"))
+            .put("date", System.currentTimeMillis()).put("icon", pending.optString("icon")).put("versionName", pending.optString("versionName"))
         val saved = if (storage.contains("searchHistory")) history else records.map { it.app.name }
         saveHistory(listOf(record.getString("name")) + saved)
         storage.edit().putString("record:$id", record.toString()).apply()
@@ -274,7 +274,7 @@ open class MainActivity : ComponentActivity() {
             return
         }
         busy = true
-        val data = JSONObject().put("id", app.id).put("name", app.name).put("icon", app.iconUrl)
+        val data = JSONObject().put("id", app.id).put("name", app.name).put("icon", app.iconUrl).put("versionName", app.versionName)
         val useRoot = storage.getBoolean("rootMode", false)
         val includeIcon = embedIcon
         if (!useRoot && Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {

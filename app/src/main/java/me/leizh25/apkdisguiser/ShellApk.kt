@@ -57,7 +57,7 @@ internal object ShellApk {
                     zip.closeEntry()
                 }
                 zip.putNextEntry(ZipEntry("AndroidManifest.xml"))
-                zip.write(manifest(app.id, app.name.take(32767), icon != null, game))
+                zip.write(manifest(app.id, app.name.take(32767), icon != null, game, app.versionName))
                 zip.closeEntry()
                 zip.putNextEntry(ZipEntry("classes.dex"))
                 context.assets.open("classes.dex").use { it.copyTo(zip) }
@@ -84,17 +84,17 @@ internal object ShellApk {
     }
 
     // Android's binary XML format. Resource-backed attribute names occupy the first string indices.
-    internal fun manifest(packageName: String, label: String, hasIcon: Boolean, game: Game): ByteArray {
+    internal fun manifest(packageName: String, label: String, hasIcon: Boolean, game: Game, versionName: String = ""): ByteArray {
         val attributes = linkedMapOf(
             "icon" to 0x01010002, "label" to 0x01010001, "name" to 0x01010003, "exported" to 0x01010010,
             "minSdkVersion" to 0x0101020c, "versionCode" to 0x0101021b,
-            "targetSdkVersion" to 0x01010270
+            "versionName" to 0x0101021c, "targetSdkVersion" to 0x01010270
         )
         val ns = "http://schemas.android.com/apk/res/android"
         val strings = (attributes.keys + listOf("android", ns, "manifest", "package",
             packageName, "uses-sdk", "application", label, "activity", game.className, "uses-permission", "android.permission.REQUEST_DELETE_PACKAGES",
             "intent-filter", "action", "android.intent.action.MAIN", "category",
-            "android.intent.category.LAUNCHER")).toList()
+            "android.intent.category.LAUNCHER", versionName)).toList()
         fun index(value: String) = strings.indexOf(value).also { check(it >= 0) }
         val stringData = ByteArrayOutputStream()
         val offsets = strings.map { value ->
@@ -121,7 +121,7 @@ internal object ShellApk {
             return node(0x102, start + attrs.fold(byteArrayOf()) { result, value -> result + value }) +
                 children + node(0x103, ints(-1, index(name)))
         }
-        val root = element("manifest", string("package", packageName), attr("versionCode", 16, 1),
+        val root = element("manifest", string("package", packageName), attr("versionCode", 16, 1), string("versionName", versionName),
             children = element("uses-sdk", attr("minSdkVersion", 16, 24),
                 attr("targetSdkVersion", 16, 35)) +
                 element("uses-permission", string("name", "android.permission.REQUEST_DELETE_PACKAGES")) +

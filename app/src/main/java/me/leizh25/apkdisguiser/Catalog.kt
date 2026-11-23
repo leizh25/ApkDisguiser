@@ -6,7 +6,7 @@ import java.net.URL
 import java.util.UUID
 import javax.net.ssl.HttpsURLConnection
 
-internal data class CatalogApp(val id: String, val name: String, val iconUrl: String = "")
+internal data class CatalogApp(val id: String, val name: String, val iconUrl: String = "", val versionName: String = "")
 
 internal class Catalog {
     private val guid = UUID.randomUUID().toString()
@@ -45,7 +45,7 @@ internal class Catalog {
                         val id = item.optString("pkg_name")
                         val name = item.optString("name").trim()
                         if (id.length <= 223 && packagePattern.matches(id) && name.isNotBlank()) {
-                            add(CatalogApp(id, name, item.optString("icon")))
+                            add(CatalogApp(id, name, item.optString("icon"), item.optString("version_name").trim()))
                         }
                     }
                 }
